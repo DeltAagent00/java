@@ -29,7 +29,7 @@ public class Team {
         }
     }
 
-    public void showInfoForisOnDistance() {
+    public void showInfoForIsOnDistance() {
         for(Competitor competitor : members) {
             if (competitor.isOnDistance()) {
                 competitor.info();

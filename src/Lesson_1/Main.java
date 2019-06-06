@@ -5,7 +5,6 @@ import Lesson_1.animal.Dog;
 import Lesson_1.human.Human;
 import Lesson_1.obstacle.Course;
 import Lesson_1.obstacle.Cross;
-import Lesson_1.obstacle.Obstacle;
 import Lesson_1.obstacle.Wall;
 
 public class Main {
@@ -16,6 +15,6 @@ public class Main {
 
         course.doIt(team);
         team.showInfoAllMembers();
-        team.showInfoForisOnDistance();
+        team.showInfoForIsOnDistance();
     }
 }
