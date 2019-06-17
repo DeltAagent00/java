@@ -1,0 +1,12 @@
+#btn1 {
+    -fx-background-color: #ffa431;
+}
+
+#textArea {
+    -fx-background-color: #dadada;
+    -fx-border-color: #000000;
+}
+
+#textField {
+    -fx-border-color: #ff00ff;
+}
