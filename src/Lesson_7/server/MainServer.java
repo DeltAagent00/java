@@ -65,6 +65,15 @@ public class MainServer {
         }
     }
 
+    public boolean isConnectedToServer(String nick) {
+        for (ClientHandler client: clients) {
+            if (client.getNick().toLowerCase().equals(nick.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void sendMsgToUsers(String userNickSend, String message, String... users) {
         final String msg = userNickSend + ": " + message;
         final Set<String> connectedUsers = new HashSet<>(users.length);

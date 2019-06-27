@@ -30,15 +30,18 @@ public class ClientHandler {
                             if(str.startsWith("/auth")) {
                                 String[] tokens = str.split(" ");
                                 // Вытаскиваем данные из БД
-                                String newNick = AuthService.getNickByLoginAndPass(tokens[1], tokens[2]);
-                                if (newNick != null) {
+                                final String newNick = AuthService.getNickByLoginAndPass(tokens[1], tokens[2]);
+                                final boolean isConnected = server.isConnectedToServer(nick);
+                                if (newNick != null && !isConnected) {
                                     // отправляем сообщение об успешной авторизации
                                     sendMsg("/authok");
                                     nick = newNick;
                                     server.subscribe(ClientHandler.this);
                                     break;
-                                } else {
+                                } else if (newNick == null) {
                                     sendMsg("Неверный логин/пароль!");
+                                } else {
+                                    sendMsg("Пользователь уже подключен!");
                                 }
                             }
                         }
