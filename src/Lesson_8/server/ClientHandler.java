@@ -4,81 +4,73 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
 
 public class ClientHandler {
-
-    private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
+    private Socket socket;
     private Main server;
     private String nick;
-    List<String> blackList;
-
-    public String getNick() {
-        return nick;
-    }
-
-    public boolean checkBlackList(String nick) {
-        return blackList.contains(nick);
-    }
 
     public ClientHandler(Socket socket, Main server) {
         try {
-            this.blackList = new ArrayList<>();
             this.socket = socket;
             this.server = server;
-            this.in = new DataInputStream(socket.getInputStream());
-            this.out = new DataOutputStream(socket.getOutputStream());
+            in = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
 
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        // цикл для авторизации
                         while (true) {
                             String str = in.readUTF();
-                            if (str.startsWith("/auth")) {
+                            // если сообщение начинается с /auth
+                            System.out.println("input = " + str);
+                            if(str.startsWith("/auth")) {
                                 String[] tokens = str.split(" ");
-                                String newNick = AuthService.getNickByLoginAndPass(tokens[1], tokens[2]);
-                                if (newNick != null) {
-                                    if (!server.isNickBusy(newNick)) {
-                                        sendMsg("/authok");
-                                        nick = newNick;
-                                        server.subscribe(ClientHandler.this);
-                                        break;
-                                    } else {
-                                        sendMsg("Учетная запись уже используется");
-                                    }
+                                // Вытаскиваем данные из БД
+                                final String newNick = AuthService.getNickByLoginAndPass(tokens[1], tokens[2]);
+                                final boolean isConnected = server.isConnectedToServer(nick);
+                                System.out.println("nick = " + nick + "isCOn = " + isConnected);
+                                if (newNick != null && !isConnected) {
+                                    // отправляем сообщение об успешной авторизации
+                                    sendMsg("/authok");
+                                    nick = newNick;
+                                    server.subscribe(ClientHandler.this);
+                                    break;
+                                } else if (newNick == null) {
+                                    sendMsg("Неверный логин/пароль!");
                                 } else {
-                                    sendMsg("Неверный логин/пароль");
+                                    sendMsg("Пользователь уже подключен!");
                                 }
                             }
-                            server.broadcastMsg(ClientHandler.this, str);
                         }
 
+                        // блок для отправки сообщений
                         while (true) {
                             String str = in.readUTF();
-                            if (str.startsWith("/")) {
-                                if (str.equals("/end")) {
-                                    out.writeUTF("/serverclosed");
-                                    break;
-                                }
-                                if (str.startsWith("/w ")) { // /w nick3 lsdfhldf sdkfjhsdf wkerhwr
-                                    String[] tokens = str.split(" ", 3);
-                                    //String m = str.substring(tokens[1].length() + 4);
-                                    server.sendPersonalMsg(ClientHandler.this, tokens[1], tokens[2]);
-                                }
-                                if (str.startsWith("/blacklist ")) {
-                                    String[] tokens = str.split(" ");
-                                    blackList.add(tokens[1]);
-                                    sendMsg("Вы добавили пользователя " + tokens[1] + " в черный список");
+                            if(str.equals("/end")) {
+                                out.writeUTF("/serverClosed");
+                                break;
+                            }
+
+                            if (str.startsWith("/w")) {
+                                final String[] inputCommand = str.split(" ");
+
+                                if (inputCommand.length > 2) {
+                                    final String msg = inputCommand[inputCommand.length - 1];
+                                    final String[] users = new String[inputCommand.length - 2];
+                                    System.arraycopy(inputCommand, 1, users, 0, inputCommand.length - 2);
+
+                                    server.sendMsgToUsers(nick, msg, users);
                                 }
                             } else {
-                                server.broadcastMsg(ClientHandler.this,nick + ": " + str);
+                                server.broadcastMsg(nick + ": " + str);
                             }
                         }
-                    } catch (IOException e) {
+                    }  catch (IOException e) {
                         e.printStackTrace();
                     } finally {
                         try {
@@ -96,14 +88,18 @@ public class ClientHandler {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
+                        server.unsubscribe(ClientHandler.this);
                     }
-                    server.unsubscribe(ClientHandler.this);
                 }
             }).start();
 
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public String getNick() {
+        return nick;
     }
 
     public void sendMsg(String msg) {

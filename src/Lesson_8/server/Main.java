@@ -6,20 +6,24 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Vector;
 
 public class Main {
     private Vector<ClientHandler> clients;
 
-    public Main() {
-        clients = new Vector<>();
+    public Main() throws SQLException {
         ServerSocket server = null;
         Socket socket = null;
+        clients = new Vector<>();
 
         try {
-            AuthService.connection();
-//            String str = AuthService.getNickByLoginAndPass("login1","pass1");
-//            System.out.println(str);
+            AuthService.connect();
+
+            // System.out.println(AuthService.getNickByLoginAndPass("login12", "pass1"));
+
             server = new ServerSocket(8189);
             System.out.println("Сервер запущен");
 
@@ -46,55 +50,69 @@ public class Main {
         }
     }
 
-    public boolean isNickBusy(String nick) {
-        for (ClientHandler o : clients) {
-            if (o.getNick().equals(nick)) {
+    // подписываем клиента на рассылку
+    public void subscribe(ClientHandler client) {
+        clients.add(client);
+    }
+
+    // отписываем клиента от рассылки сообщений
+    public void unsubscribe(ClientHandler client){
+        clients.remove(client);
+    }
+
+    public void broadcastMsg(String msg) {
+        for (ClientHandler o: clients) {
+            o.sendMsg(msg);
+        }
+    }
+
+    public boolean isConnectedToServer(String nick) {
+        for (ClientHandler client: clients) {
+            if (client.getNick().toLowerCase().equals(nick.toLowerCase())) {
                 return true;
             }
         }
         return false;
     }
 
-    public void subscribe(ClientHandler client) {
-        clients.add(client);
-        broadcastClientList();
-    }
+    public void sendMsgToUsers(String userNickSend, String message, String... users) {
+        final String msg = userNickSend + ": " + message;
+        final Set<String> connectedUsers = new HashSet<>(users.length);
+        ClientHandler myClient = null;
 
-    public void unsubscribe(ClientHandler client) {
-        clients.remove(client);
-        broadcastClientList();
-    }
 
-    public void broadcastMsg(ClientHandler from, String msg) {
-        for (ClientHandler o : clients) {
-            if (!o.checkBlackList(from.getNick())) {
-                o.sendMsg(msg);
+        for (ClientHandler client: clients) {
+            if (client.getNick().toLowerCase().equals(userNickSend.toLowerCase())) {
+                myClient = client;
+                continue;
+            }
+            for (String user: users) {
+                if (client.getNick().toLowerCase().equals(user.toLowerCase())) {
+                    client.sendMsg(msg);
+                    connectedUsers.add(user);
+                    break;
+                }
             }
         }
-    }
 
-    public void sendPersonalMsg(ClientHandler from, String nickTo, String msg) {
-        for (ClientHandler o : clients) {
-            if (o.getNick().equals(nickTo)) {
-                o.sendMsg("from " + from.getNick() + ": " + msg);
-                from.sendMsg("to " + nickTo + ": " + msg);
-                return;
+        if (!connectedUsers.isEmpty() && myClient != null) {
+            final StringBuilder myMessage = new StringBuilder(userNickSend).append(" -> [");
+            int i = 0;
+            for (String user: connectedUsers) {
+                final boolean isLast = (i + 1 == connectedUsers.size());
+
+                myMessage.append(" ");
+                myMessage.append(user);
+
+                if (!isLast) {
+                    myMessage.append(",");
+                } else {
+                    myMessage.append("]: ");
+                    myMessage.append(message);
+                }
+                i++;
             }
-        }
-        from.sendMsg("Клиент с ником " + nickTo + " не найден в чате");
-    }
-
-    public void broadcastClientList() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("/clientlist ");
-        for (ClientHandler o : clients) {
-            sb.append(o.getNick() + " ");
-        }
-
-        String out = sb.toString();
-
-        for (ClientHandler o : clients) {
-            o.sendMsg(out);
+            myClient.sendMsg(myMessage.toString());
         }
     }
 }
